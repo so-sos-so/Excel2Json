@@ -1,0 +1,12 @@
+# 路径像json_path这种，名字需要加path，因为要计算绝对路径，而有的配置不需要计算，所以路径需要加个标识
+# #开头会被注释
+exe_path = /build/ExcelToJson.exe
+header = 3
+low_case = false
+config_path = /config.txt
+excel_path = /Tables
+json_path = /json
+script_path = /cs
+script_template_path = /ScriptTemplate.txt
+script_manager_template_path = /ScriptManagerTemplate.txt
+json_load = $"{Application.streamingAssetsPath}/Table/"

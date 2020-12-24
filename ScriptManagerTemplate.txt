@@ -1,0 +1,31 @@
+using System.Collections.Generic;
+using System.IO;
+using Newtonsoft.Json;
+using UnityEngine;
+
+public static class ConfigManager
+{
+#field_dics
+    private static string JsonPath = #json_path;
+
+    public static void Load()
+    {
+#load_config
+    }
+
+    private static Dictionary<int, T> LoadOneConfig<T>(string configName)
+    {
+        var path = Path.Combine(JsonPath, configName);
+        var jsonContent = ResLoad(path);
+        return JsonConvert.DeserializeObject<Dictionary<int, T>>(jsonContent);
+    }
+
+    private static string ResLoad(string path)
+    {
+        var jsonTxt = Resources.Load<TextAsset>(path);
+        Debug.Assert(jsonTxt != null, $"{path} can not find");
+        return jsonTxt.text;
+    }
+
+#get_by_id
+}
