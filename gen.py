@@ -2,9 +2,8 @@ import platform
 import re
 import os
 
-root_path = os.getcwd()
 isMac = re.match("[Ww]indows", platform.system()) == None
-config_path = root_path + "/config.txt"
+config_path = os.path.abspath("config.txt")
 exe_path = ""
 para = []
 with open(config_path, 'r', encoding="UTF-8") as f:
@@ -17,7 +16,7 @@ with open(config_path, 'r', encoding="UTF-8") as f:
             key = "--"+key
             value = match.group(2)
             if("path" in key):
-                value = root_path + value
+                value = os.path.abspath(value)
             if("exe_path" in key):
                 exe_path = value
                 continue

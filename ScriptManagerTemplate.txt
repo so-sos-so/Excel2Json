@@ -1,31 +1,65 @@
 using System.Collections.Generic;
-using System.IO;
+using System.Reflection;
+using Framework.Assets;
+using Framework.Asynchronous;
 using Newtonsoft.Json;
 using UnityEngine;
 
 public static class ConfigManager
 {
 #field_dics
-    private static string JsonPath = #json_path;
+    private static Dictionary<int, Dictionary<int, BuildingData>> BuildingTrueIdData =
+		new Dictionary<int, Dictionary<int, BuildingData>>();
 
-    public static void Load()
+    public static IProgressResult<float> Load()
     {
-#load_config
+	    MulProgressResult progressResult = new MulProgressResult();
+	    var properties = typeof(ConfigManager).GetProperties(BindingFlags.Static | BindingFlags.Public);
+	    foreach (var propertyInfo in properties)
+	    {
+		    var _propertyInfo = propertyInfo;
+		    var progress = Res.Default.LoadAssetAsync<TextAsset>(_propertyInfo.Name);
+		    progressResult.AddProgress(progress);
+		    progress.Callbackable().OnCallback(result =>
+		    {
+			    _propertyInfo.SetValue(null,
+				    JsonConvert.DeserializeObject(result.Result.text, _propertyInfo.PropertyType));
+		    });
+	    }
+		
+	    return progressResult;
     }
+	
+	public static void LoadLevelData()
+    {
+	    LoadBuildingLevelData();
+    }
+	
+    private static void LoadBuildingLevelData()
+	{
+		if (BuildingTrueIdData.Keys.Count != 0)
+			return;
+		for (int i = 1; i <= BuildingData.Keys.Count; i++)
+		{
+			var buildingLevelData = BuildingData[i];
+			if(BuildingTrueIdData.ContainsKey(buildingLevelData.BuildingID))
+			{
+				BuildingTrueIdData[buildingLevelData.BuildingID].Add(buildingLevelData.Level, buildingLevelData);
+			}
+			else
+			{
+				BuildingTrueIdData.Add(buildingLevelData.BuildingID, new Dictionary<int, BuildingData>());
+				BuildingTrueIdData[buildingLevelData.BuildingID].Add(buildingLevelData.Level, buildingLevelData);
+			}
+		}
+	}
 
-    private static Dictionary<int, T> LoadOneConfig<T>(string configName)
-    {
-        var path = Path.Combine(JsonPath, configName);
-        var jsonContent = ResLoad(path);
-        return JsonConvert.DeserializeObject<Dictionary<int, T>>(jsonContent);
-    }
-
-    private static string ResLoad(string path)
-    {
-        var jsonTxt = Resources.Load<TextAsset>(path);
-        Debug.Assert(jsonTxt != null, $"{path} can not find");
-        return jsonTxt.text;
-    }
+	public static BuildingData GetBuildingDataByIdLevel(int id, int level)
+	{
+		if (BuildingTrueIdData.TryGetValue(id, out var data))
+			return data.TryGetValue(level, out var levelData) ? levelData : null;
+		return null;
+	}
 
 #get_by_id
 }

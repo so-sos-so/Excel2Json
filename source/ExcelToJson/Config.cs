@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Text;
 using CommandLine;
@@ -31,21 +32,18 @@ namespace ExcelToJson
             ExportArray = options.Lowcase;
         }
 
-        [Option('h', "header", Required = true, HelpText = "number lines in sheet as header.")]
+        [Option("header")]
         public int HeaderRows { get; set; }
 
         // [Option('c', "encoding", Required = false, DefaultValue = "utf8-nobom", HelpText = "export file encoding.")]
         // public string Encoding { get; set; }
 
-        [Option('l', "low_case", Required = true, DefaultValue = false, HelpText = "convert filed name to lowcase.")]
+        [Option("low_case")]
         public bool Lowcase { get; set; }
 
-        [Option('a', "array", Required = false, DefaultValue = false,
-            HelpText = "export as array, otherwise as dict object.")]
+        [Option("array")]
         public bool ExportArray { get; set; }
         
-        [Option('c', "config_path", Required = true, DefaultValue = "", HelpText = "config file path")]
-        public string ConfigPath { get; set; }
         [Option( "excel_path")]
         public string ExcelPath { get; set; }
         [Option( "json_path")]
@@ -58,5 +56,15 @@ namespace ExcelToJson
         public string ScriptManagerTemplate { get; set; }
         [Option( "json_load")]
         public string JsonLoadPath { get; set; }
+
+        public void Check()
+        {
+            if(!Directory.Exists(ExcelPath))
+                Console.WriteLine($"{ExcelPath} not exist");
+            if(!File.Exists(ScriptTemplate))
+                Console.WriteLine($"{ScriptTemplate} not exist");
+            if(!File.Exists(ScriptManagerTemplate))
+                Console.WriteLine($"{ScriptManagerTemplate} not exist");
+        }
     }
 }

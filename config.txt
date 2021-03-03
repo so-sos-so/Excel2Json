@@ -1,12 +1,13 @@
 # 路径像json_path这种，名字需要加path，因为要计算绝对路径，而有的配置不需要计算，所以路径需要加个标识
+# 路径可以填绝对路径和相对py脚本路径
 # #开头会被注释
-exe_path = /build/ExcelToJson.exe
+exe_path = build/ExcelToJson.exe
 header = 3
 low_case = false
-config_path = /config.txt
-excel_path = /Tables
-json_path = /json
-script_path = /cs
-script_template_path = /ScriptTemplate.txt
-script_manager_template_path = /ScriptManagerTemplate.txt
-json_load = $"{Application.streamingAssetsPath}/Table/"
+config_path = sample/config.txt
+excel_path = sample/Tables
+json_path = sample/json
+script_path = sample/cs
+script_template_path = ScriptTemplate.txt
+script_manager_template_path = ScriptManagerTemplate.txt
+json_load = \"/Table/\"
