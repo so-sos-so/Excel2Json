@@ -1,11 +1,14 @@
 ﻿using System;
+using System.CodeDom.Compiler;
 using System.IO;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using Excel;
+using Microsoft.CSharp;
 
 namespace ExcelToJson
 {
@@ -18,20 +21,32 @@ namespace ExcelToJson
         [STAThread]
         static void Main(string[] args)
         {
-            ParseConfig(args);
-            foreach (string str in ExcelPaths)
+            using (var ms = new MemoryStream())
             {
-                loadExcel(str);
+                ParseConfig(args);
+                CreateDir();
+                List<string> cs = new List<string>();
+                foreach (string excelPath in ExcelPaths)
+                {
+                    cs.Add(CSExporter.GenClass(excelPath));
+                }
+                RuntimeAssembly.Compile(cs);
+                
+                foreach (string str in ExcelPaths)
+                {
+                    JsonExporter.GenJson(str);
+                }
+                
+                GenCsManager();
+                Console.WriteLine(" ************** Exprot Succeed ! *************** ");
             }
-            GenCsManager();
-            Console.WriteLine(" ************** Exprot Succeed ! *************** ");
         }
 
         private static void ParseConfig(string[] args)
         {
-            CommandLine.Parser.Default.ParseArguments(args, Config.Options);
-            Config.Options.Check();
-            DirectoryInfo root = new DirectoryInfo(Config.Options.ExcelPath);
+            CommandLine.Parser.Default.ParseArguments(args, Options.Default);
+            Options.Default.Check();
+            DirectoryInfo root = new DirectoryInfo(Options.Default.ExcelPath);
             FileInfo[] files = root.GetFiles("*.xlsx");
             foreach (FileInfo file in files)
             {
@@ -40,49 +55,15 @@ namespace ExcelToJson
             }
         }
 
-        private static void loadExcel(string path)
+        private static void CreateDir()
         {
-            var name = Path.GetFileNameWithoutExtension(path);
-            Directory.CreateDirectory(Config.Options.ScriptPath);
-            Directory.CreateDirectory(Config.Options.JsonPath);
-            loadExcel(path, Path.Combine(Config.Options.ScriptPath, $"{name}.cs"),
-                Path.Combine(Config.Options.JsonPath, $"{name}.json"));
+            Directory.CreateDirectory(Options.Default.ScriptPath);
+            Directory.CreateDirectory(Options.Default.JsonPath);
         }
-
-        private static void loadExcel(string excelPath, string scriptPath, string jsonPath)
-        {
-            string excelName = Path.GetFileNameWithoutExtension(excelPath);
-
-            // 加载Excel文件
-            using (FileStream excelFile = File.Open(excelPath, FileMode.Open, FileAccess.Read))
-            {
-                IExcelDataReader excelReader = ExcelReaderFactory.CreateOpenXmlReader(excelFile);
-
-                excelReader.IsFirstRowAsColumnNames = true;
-                DataSet book = excelReader.AsDataSet();
-
-                // 数据检测
-                if (book.Tables.Count < 1)
-                {
-                    throw new Exception("Excel file is empty: " + excelPath);
-                }
-
-                // 取得数据
-                DataTable sheet = book.Tables[0];
-                if (sheet.Rows.Count <= 0)
-                {
-                    throw new Exception("Excel Sheet is empty: " + excelPath);
-                }
-                
-                CSExporter.GenClass(scriptPath, sheet);
-                JsonExporter.GenJson(jsonPath, sheet);
-                Console.WriteLine(" -- " + excelName + ".xslx");
-            }
-        }
-
+        
         private static void GenCsManager()
         {
-            var template = File.ReadAllText(Config.Options.ScriptManagerTemplate);
+            var template = File.ReadAllText(Options.Default.ScriptManagerTemplate);
             string managerName = Regex.Match(template, @"class\s+(\w+)").Groups[1].Value;
             StringBuilder field_dics = new StringBuilder();
             StringBuilder get_by_id = new StringBuilder();
@@ -94,9 +75,9 @@ namespace ExcelToJson
             }
             template = template.Replace("#field_dics", field_dics.ToString());
             template = template.Replace("#get_by_id", get_by_id.ToString());
-            using (FileStream file = new FileStream(Path.Combine(Config.Options.ScriptPath, $"{managerName}.cs"), FileMode.Create, FileAccess.Write))
+            using (FileStream file = new FileStream(Path.Combine(Options.Default.ScriptPath, $"{managerName}.cs"), FileMode.Create, FileAccess.Write))
             {
-                using (TextWriter writer = new StreamWriter(file, Config.Encoding))
+                using (TextWriter writer = new StreamWriter(file, Options.Default.Encoding))
                     writer.Write(template);
             }
         }

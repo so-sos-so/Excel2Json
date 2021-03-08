@@ -1,9 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Data;
 using System.Text;
-using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using Excel;
 
 namespace ExcelToJson
 {
@@ -13,76 +14,94 @@ namespace ExcelToJson
 	/// </summary>
 	class CSExporter
 	{
+		
 		struct FieldDef
 		{
-			public string name;
-			public string type;
-			public string comment;
+			public string Name;
+			public string Type;
+			public string Remark;
 		}
 
-		private static List<FieldDef> _fieldList;
-
-		public static void GenClass(string path, DataTable sheet)
+		public static string GenClass(string excelPath)
 		{
-			//-- First Row as Column Name
-			if (sheet.Rows.Count < 2)
-				return;
-
-			ParseField(sheet);
-			var csName = Path.GetFileNameWithoutExtension(path);
-			var template = File.ReadAllText(Config.Options.ScriptTemplate);
-			template = template.Replace("#class_name", csName);
-
-			StringBuilder fieldsb = new StringBuilder();
-			foreach (FieldDef field in _fieldList)
+			// 加载Excel文件
+			using (FileStream excelFile = File.Open(excelPath, FileMode.Open, FileAccess.Read))
 			{
-				fieldsb.AppendFormat("\tpublic {0} {1} {{ get; set; }}// {2}", field.type, field.name, field.comment);
-				fieldsb.AppendLine();
-			}
-			template = template.Replace("#fields", fieldsb.ToString());
-			using (FileStream file = new FileStream(path, FileMode.Create, FileAccess.Write))
-			{
-				using (TextWriter writer = new StreamWriter(file, Config.Encoding))
-					writer.Write(template);
+				IExcelDataReader excelReader = ExcelReaderFactory.CreateOpenXmlReader(excelFile);
+
+				excelReader.IsFirstRowAsColumnNames = true;
+				DataSet book = excelReader.AsDataSet();
+
+				// 数据检测
+				if (book.Tables.Count < 1)
+				{
+					throw new Exception("Excel file is empty: " + excelPath);
+				}
+
+				// 取得数据
+				DataTable sheet = book.Tables[0];
+				if (sheet.Rows.Count <= 0)
+				{
+					throw new Exception("Excel Sheet is empty: " + excelPath);
+				}
+				
+				var csName = Path.GetFileNameWithoutExtension(excelPath);
+				var scriptPath = Path.Combine(Options.Default.ScriptPath, $"{csName}.cs");
+				var fieldList = ParseField(sheet);
+				var template = File.ReadAllText(Options.Default.ScriptTemplate);
+				template = template.Replace("#class_name", csName);
+
+				StringBuilder sb = new StringBuilder();
+				foreach (FieldDef field in fieldList)
+				{
+					sb.AppendFormat("\tpublic {0} {1} {{ get; set; }}// {2}", field.Type, field.Name, field.Remark);
+					sb.AppendLine();
+				}
+				
+				template = template.Replace("#fields", sb.ToString());
+				using (FileStream file = new FileStream(scriptPath, FileMode.Create, FileAccess.Write))
+				{
+					using (TextWriter writer = new StreamWriter(file, Options.Default.Encoding))
+						writer.Write(template);
+				}
+				Console.WriteLine(" -- " + csName);
+				return template;
 			}
 		}
+		
+		private const string ArrayPre = "array_";
+		private const string DicPre = "dic_";
 
-		private static void ParseField(DataTable sheet)
+		private static List<FieldDef> ParseField(DataTable sheet)
 		{
-			_fieldList = new List<FieldDef>();
+			var result = new List<FieldDef>();
 			DataRow typeRow = sheet.Rows[0];
 			DataRow commentRow = sheet.Rows[1];
 
 			foreach (DataColumn column in sheet.Columns)
 			{
 				FieldDef field;
-				field.name = column.ToString();
-				field.type = typeRow[column].ToString();
-				if (field.type == "arraystring")
+				field.Name = column.ToString();
+				var typeStr = typeRow[column].ToString();
+				if (typeStr.Contains(ArrayPre))
 				{
-					field.type = "List<string>";
+                    
+					var listTypeStr = typeStr.Replace(ArrayPre, "");
+					typeStr = $"List<{listTypeStr}>";
 				}
-				else if (field.type == "arrayint")
+				else if(typeStr.Contains(DicPre))
 				{
-					field.type = "List<int>";
-				}
-				else if (field.type == "arrayfloat")
-				{
-					field.type = "List<float>";
-				}
-				else if (field.type == "array")
-				{
-					field.type = "List<string>";
-				}
-				else if (field.type == "dic")
-				{
-					field.type = "Dictionary<int, int>";
+                    
+					var match = Regex.Match(typeStr, @"\w+_(\w+)_(\w+)");
+					typeStr = $"Dictionary<{match.Groups[1].Value}, {match.Groups[2].Value}>";
 				}
 
-				field.comment = Regex.Replace(commentRow[column].ToString(), "[\r\n\t]", " ", RegexOptions.Compiled); ;
-
-				_fieldList.Add(field);
+				field.Type = typeStr;
+				field.Remark = Regex.Replace(commentRow[column].ToString(), "[\r\n\t]", " ", RegexOptions.Compiled); ;
+				result.Add(field);
 			}
+
+			return result;
 		}
 	}
 }

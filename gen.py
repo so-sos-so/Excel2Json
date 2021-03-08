@@ -24,6 +24,7 @@ with open(config_path, 'r', encoding="UTF-8") as f:
             para.append(value)
 
 cmd = "{} {} ".format(exe_path, " ".join(para))
+
 if isMac:
     cmd = "mono " + cmd
 res = os.popen(cmd)
